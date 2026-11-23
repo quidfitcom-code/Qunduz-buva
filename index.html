@@ -132,7 +132,7 @@
             <!-- 1. ANKETA -->
             <div id="profile-screen" class="space-y-3 my-auto">
                 <div class="w-full h-36 bg-black border border-red-950 rounded-lg overflow-hidden relative flex items-center justify-center shadow-inner">
-                    <img src="street_night.gif" alt="Qunduz buva game" decoding="async" class="w-full h-full object-cover opacity-60">
+                    <img src="street_night.gif" alt="Qunduz buva game" fetchpriority="high" decoding="async" class="w-full h-full object-cover opacity-60">
                     <div class="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent flex flex-col justify-end p-3">
                         <span class="text-xs text-red-400 tracking-widest uppercase">ARXIV TIZIMI // RO'YXAT</span>
                         <span class="text-xl font-titleFont text-red-500 blood-glow">Qunduz buva game</span>
@@ -295,7 +295,45 @@
         let isPlaying = false;
         let currentTrack = "";
         let pendingAutoplaySrc = "";
+        // Кэш изображений: для каждого файла хранится Promise загрузки.
+        // Это позволяет не запускать повторные запросы при переходах между сценами.
         const preloadedImages = new Map();
+
+        function preloadImage(src) {
+            if (!src) return Promise.resolve(null);
+
+            const cached = preloadedImages.get(src);
+            if (cached) return cached;
+
+            const img = new Image();
+            img.decoding = "async";
+            img.loading = "eager";
+            img.src = src;
+
+            const loadPromise = new Promise((resolve) => {
+                const finish = async () => {
+                    // decode() помогает подготовить изображение до показа.
+                    // Если WebView не поддерживает decode или он завершится ошибкой,
+                    // уже загруженный файл всё равно можно показать.
+                    if (typeof img.decode === "function") {
+                        try { await img.decode(); } catch (_) {}
+                    }
+                    resolve(img);
+                };
+
+                if (img.complete && img.naturalWidth > 0) {
+                    finish();
+                } else {
+                    img.addEventListener("load", finish, { once: true });
+                    img.addEventListener("error", () => resolve(null), { once: true });
+                }
+            });
+
+            preloadedImages.set(src, loadPromise);
+            return loadPromise;
+        }
+
+        let sceneLoadToken = 0;
 
         let gameState = {
             hp: 100,
@@ -306,21 +344,14 @@
             inventory: []
         };
 
-        function preloadImage(src) {
-            if (!src || preloadedImages.has(src)) return;
-            const img = new Image();
-            img.decoding = "async";
-            img.src = src;
-            preloadedImages.set(src, img);
-        }
-
         function preloadNextScenes(step) {
             if (!currentStory || !step?.buttons) return;
+
+            // Загружаем только изображения доступных следующих переходов.
+            // Не ждём их здесь: игрок может читать текст, пока файлы загружаются.
             step.buttons.forEach(btn => {
                 const nextStep = currentStory[btn.next];
-                if (nextStep?.image) {
-                    preloadImage(nextStep.image);
-                }
+                if (nextStep?.image) preloadImage(nextStep.image);
             });
         }
 
@@ -623,7 +654,6 @@
             document.getElementById('story-screen').classList.add('hidden');
             document.getElementById('game-screen').classList.remove('hidden');
 
-            preloadImage(currentStory.step1?.image);
             playTrack(currentStory.music, true);
             showScene('step1');
         }
@@ -652,8 +682,21 @@
             document.getElementById('time-display').innerText = step.time || "02:15 AM";
 
             const sceneImg = document.getElementById('scene-img');
-            preloadImage(step.image);
-            sceneImg.src = step.image;
+            const thisLoadToken = ++sceneLoadToken;
+
+            // Текст и кнопки показываются сразу, не дожидаясь картинки.
+            // Если картинка уже предзагружена, она появится практически мгновенно.
+            // Если ещё нет — текущий кадр останется на экране до готовности нового.
+            preloadImage(step.image).then((loadedImage) => {
+                if (thisLoadToken !== sceneLoadToken) return; // пользователь уже перешёл дальше
+                if (loadedImage) {
+                    sceneImg.src = loadedImage.src;
+                } else {
+                    // При ошибке загрузки оставляем стандартное поведение браузера
+                    // и показываем URL, чтобы не ломать дальнейшую работу сцены.
+                    sceneImg.src = step.image;
+                }
+            });
 
             const descEl = document.getElementById('story-text');
             typeText(descEl, step.text);
