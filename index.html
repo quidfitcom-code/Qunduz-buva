@@ -48,7 +48,20 @@
         }
 
         .vignette {
-            box-shadow: inset 0 0 120px rgba(0,0,0,0.95);
+            box-shadow: inset 0 0 140px rgba(0,0,0,0.98);
+        }
+
+        @keyframes flicker {
+            0% { opacity: 0.96; }
+            50% { opacity: 1; }
+            52% { opacity: 0.92; }
+            54% { opacity: 1; }
+            80% { opacity: 0.97; }
+            100% { opacity: 0.99; }
+        }
+
+        .crt-flicker {
+            animation: flicker 0.16s infinite;
         }
 
         .blood-glow {
@@ -96,12 +109,12 @@
 </head>
 <body class="crt min-h-screen flex items-center justify-center p-0 sm:p-4">
 
-    <audio id="bg-music" loop preload="metadata"></audio>
-    <audio id="screamer-sound" preload="auto">
+    <audio id="bg-music" loop></audio>
+    <audio id="screamer-sound">
         <source src="screamer.mp3" type="audio/mpeg">
     </audio>
 
-    <div class="w-full max-w-md h-[100vh] sm:h-[880px] bg-panelBg border-0 sm:border-2 border-red-900/60 sm:rounded-2xl shadow-2xl vignette flex flex-col relative overflow-hidden">
+    <div class="w-full max-w-md h-[100vh] sm:h-[880px] bg-panelBg border-0 sm:border-2 border-red-900/60 sm:rounded-2xl shadow-2xl vignette flex flex-col relative overflow-hidden crt-flicker">
 
         <!-- Top Status Bar -->
         <header class="bg-black/95 border-b border-red-900/50 p-3 flex justify-between items-center z-10 shrink-0">
@@ -132,7 +145,7 @@
             <!-- 1. ANKETA -->
             <div id="profile-screen" class="space-y-3 my-auto">
                 <div class="w-full h-36 bg-black border border-red-950 rounded-lg overflow-hidden relative flex items-center justify-center shadow-inner">
-                    <img src="street_night.gif" alt="Qunduz buva game" fetchpriority="high" decoding="async" class="w-full h-full object-cover opacity-60">
+                    <img src="street_night.webp" alt="Qunduz buva game" fetchpriority="high" decoding="async" loading="eager" class="w-full h-full object-cover opacity-60 filter contrast-125">
                     <div class="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent flex flex-col justify-end p-3">
                         <span class="text-xs text-red-400 tracking-widest uppercase">ARXIV TIZIMI // RO'YXAT</span>
                         <span class="text-xl font-titleFont text-red-500 blood-glow">Qunduz buva game</span>
@@ -230,7 +243,7 @@
             <div id="game-screen" class="hidden flex-1 flex flex-col justify-between">
                 <div class="w-full h-44 sm:h-52 bg-black border border-red-950 rounded-lg overflow-hidden relative mb-3 flex items-center justify-center shadow-inner shrink-0">
                     <div class="absolute inset-0 bg-red-950/20 z-0"></div>
-                    <img id="scene-img" src="" alt="Scene" decoding="async" class="w-full h-full object-cover z-10">
+                    <img id="scene-img" src="" alt="Scene" class="w-full h-full object-cover z-10 filter contrast-125 brightness-80">
                     <div id="time-display" class="absolute bottom-2 left-2 z-20 bg-black/85 px-2 py-0.5 rounded text-xs text-red-400 border border-red-900/60">
                         02:15 AM
                     </div>
@@ -295,45 +308,6 @@
         let isPlaying = false;
         let currentTrack = "";
         let pendingAutoplaySrc = "";
-        // Кэш изображений: для каждого файла хранится Promise загрузки.
-        // Это позволяет не запускать повторные запросы при переходах между сценами.
-        const preloadedImages = new Map();
-
-        function preloadImage(src) {
-            if (!src) return Promise.resolve(null);
-
-            const cached = preloadedImages.get(src);
-            if (cached) return cached;
-
-            const img = new Image();
-            img.decoding = "async";
-            img.loading = "eager";
-            img.src = src;
-
-            const loadPromise = new Promise((resolve) => {
-                const finish = async () => {
-                    // decode() помогает подготовить изображение до показа.
-                    // Если WebView не поддерживает decode или он завершится ошибкой,
-                    // уже загруженный файл всё равно можно показать.
-                    if (typeof img.decode === "function") {
-                        try { await img.decode(); } catch (_) {}
-                    }
-                    resolve(img);
-                };
-
-                if (img.complete && img.naturalWidth > 0) {
-                    finish();
-                } else {
-                    img.addEventListener("load", finish, { once: true });
-                    img.addEventListener("error", () => resolve(null), { once: true });
-                }
-            });
-
-            preloadedImages.set(src, loadPromise);
-            return loadPromise;
-        }
-
-        let sceneLoadToken = 0;
 
         let gameState = {
             hp: 100,
@@ -343,17 +317,6 @@
             typeInterval: null,
             inventory: []
         };
-
-        function preloadNextScenes(step) {
-            if (!currentStory || !step?.buttons) return;
-
-            // Загружаем только изображения доступных следующих переходов.
-            // Не ждём их здесь: игрок может читать текст, пока файлы загружаются.
-            step.buttons.forEach(btn => {
-                const nextStep = currentStory[btn.next];
-                if (nextStep?.image) preloadImage(nextStep.image);
-            });
-        }
 
         music.addEventListener('play', () => {
             isPlaying = true;
@@ -401,7 +364,7 @@
                 step1: {
                     title: "Kadr 1: Qorong'u ko'cha",
                     time: "02:15 AM",
-                    image: "street_night.gif",
+                    image: "street_night.webp",
                     text: "Kechasi sovuq ko'chadan ketib boryapsan. Tungi soat 2:15. To'satdan orqa tomondan kimdir seni isming bilan sekin chaqirdi...",
                     buttons: [
                         { text: "A) Orqaga o'girilib qarash 👀", next: "step2_woman", hp: 0, sanity: -5 },
@@ -411,7 +374,7 @@
                 step2_woman: {
                     title: "Kadr 2: Oq ko'ylakli ayol",
                     time: "02:20 AM",
-                    image: "woman_in_white.gif",
+                    image: "woman_in_white.webp",
                     text: "Sen orqaga o'girilding. Xira fonar nuri ostida oq ko'ylak kiygan ayol yuzini sochlari bilan to'sgancha jimgina senga qarab turibdi. U yig'lamsirab: 'Manga yordam ber...' dedi.",
                     buttons: [
                         { text: "A) Yordam berish 🤝", next: "step3", hp: 0, sanity: +5 },
@@ -421,7 +384,7 @@
                 step2_1_swamp: {
                     title: "Kadr 2.1: Botqoqlik",
                     time: "02:28 AM",
-                    image: "swamp.gif",
+                    image: "swamp.webp",
                     text: "Sen qo'rqib qochib ketding va qorong'ulikda botqoqlikka kirib qolding. Oyoqlaringni loy sekin-sekin yutib, pastga tortmoqda. To'satdan oldingda paydo bo'lib o'sha ayol jimgina qarab turibdi...",
                     buttons: [
                         { text: "A) Cho'kib o'lish 💀", next: "death_swamp_sink", hp: -100, sanity: -100 },
@@ -431,7 +394,7 @@
                 death_swamp_sink: {
                     title: "O'lim 💀",
                     time: "02:35 AM",
-                    image: "monster_jump.jpg",
+                    image: "monster_jump.webp",
                     text: "Hech kimdan yordam so'ramasdan, botqoq seni oxirigacha yutib yubordi... O'yin tugadi!",
                     action: "die",
                     buttons: [
@@ -441,7 +404,7 @@
                 death_swamp_revenge: {
                     title: "O'lim 💀",
                     time: "02:35 AM",
-                    image: "woman_angry.jpg",
+                    image: "woman_angry.webp",
                     text: "Sen ayoldan yordam so'rading. Lekin u sovuqqonlik bilan dedi: 'Men sendan yordam so'radim, lekin sen yordam bermading... Men ham senga yordam bermayman!' U burilib ketdi, botqoq esa seni yutib yubordi...",
                     action: "die",
                     buttons: [
@@ -451,7 +414,7 @@
                 step1_2_forest: {
                     title: "Kadr 1.2: Qorong'u o'rmon",
                     time: "02:22 AM",
-                    image: "red_eyes_forest.gif",
+                    image: "red_eyes_forest.webp",
                     text: "Sen to'xtamasdan yugurib, qorong'u so'qmoqqa kirding. Oldinda milt-milt qilgan qizil ko'zlar yaqinlashmoqda!",
                     buttons: [
                         { text: "A) Oldinga qarab yurish 🚶‍♂️", next: "death_step", hp: -100, sanity: -100 },
@@ -461,7 +424,7 @@
                 death_step: {
                     title: "O'lim 💀",
                     time: "02:26 AM",
-                    image: "monster_jump.jpg",
+                    image: "monster_jump.webp",
                     text: "Maxluq seni ushlab oldi! O'yin tugadi!",
                     action: "die",
                     buttons: [
@@ -471,7 +434,7 @@
                 step3: {
                     title: "Kadr 3: Minnatdorchilik",
                     time: "02:40 AM",
-                    image: "step3_help.jpg",
+                    image: "step3_help.webp",
                     item: "Uy kaliti",
                     text: "Sen ayolga yordam berding. Uning yuzidagi dahshatli ko'rinish yo'qolib, sokinlashdi. U senga kalit uzatib dedi: 'Sen mening qalbimdagi sovuqlikni eritding...'",
                     buttons: [
@@ -482,7 +445,7 @@
                 step3_secret: {
                     title: "Kadr 3.1: Sirli suhbat",
                     time: "02:45 AM",
-                    image: "secret_room.jpg",
+                    image: "secret_room.webp",
                     text: "Sen to'xtading va unga yana savol berishga qaror qilding.",
                     buttons: [
                         { text: "A) Senga nima bo'ldi? 👤", next: "step3_truth", hp: 0, sanity: -10 },
@@ -492,7 +455,7 @@
                 step3_truth: {
                     title: "Kadr 3.2: Dahshatli haqiqat",
                     time: "02:50 AM",
-                    image: "woman_ghost.jpg",
+                    image: "woman_ghost.webp",
                     text: "Ayolning ko'zlarida qo'rquv paydo bo'ldi va u past ovozda dedi: 'Meni o'rmondagi o'sha qizil ko'zlar o'ldirishdi... Tezroq uyga kir, bo'lmasa seni ham o'ldirishadi!'",
                     buttons: [
                         { text: "🚪 Uyga kirib eshikni qulflash", next: "step4", hp: 0, sanity: -5 }
@@ -501,7 +464,7 @@
                 death_trap: {
                     title: "O'lim 💀",
                     time: "02:52 AM",
-                    image: "monster_jump.jpg",
+                    image: "monster_jump.webp",
                     text: "Qiz shivirladi: 'Kech qolding... ular sening orqangda!' Shu onda orqangdan sovuq nafas sezildi... O'yin tugadi!",
                     action: "die",
                     buttons: [
@@ -511,7 +474,7 @@
                 step4: {
                     title: "Kadr 4: Uydagi tuzoq",
                     time: "03:05 AM",
-                    image: "house_inside.jpg",
+                    image: "house_inside.webp",
                     text: "Sen tezlik bilan uyga kirib, eshikni qulflading. Yuraging qorong'u xonada duk-duk urmoqda. To'satdan eshik tinimsiz va kuchli tarzda taqillay boshladi! Xonaga qarasang: bir chetida eski divan, ikkinchi chetida esa katta shkaf turibdi.",
                     buttons: [
                         { text: "A) Divanning tagiga kirish 🛋️", next: "step5_1", hp: -100, sanity: -100 },
@@ -521,7 +484,7 @@
                 step5_1: {
                     title: "Kadr 5.1: Fojia",
                     time: "03:12 AM",
-                    image: "monster_under_bed.jpg",
+                    image: "monster_under_bed.webp",
                     text: "Sen shoshilinch ravishda divan tagiga yashirinding. Eshik bir zarba bilan sindirib ochildi! Dahshatli mahluq sekin odimlab ichkariga kirdi, egilib divan ostiga qaradi va jirkanch jilmayib dedi: 'Men seni topdim...' Jonhizra qichqiriq... O'yin tugadi!",
                     action: "die",
                     buttons: [
@@ -531,7 +494,7 @@
                 step5_2: {
                     title: "Kadr 5.2: Kutilmagan yordam",
                     time: "03:18 AM",
-                    image: "wardrobe_hide.jpg",
+                    image: "wardrobe_hide.webp",
                     text: "Sen shkaf ichiga kirib, eshigini sekin yopding. Eshik sindirildi va mahluq ichkariga bostirib kirib xirilladi: 'Men seni baribir topaman!' Lekin to'satdan xonada haligi qizning sovuq ovozi eshitildi: 'Sen unga ozor berishingga qo'ymayman!' Mahluq qo'rqib orqasiga o'girildi va qiz uni o'zi bilan olib ketdi!",
                     buttons: [
                         { text: "🌅 Tong otishini kutish", next: "win_final", hp: 0, sanity: +15 }
@@ -540,7 +503,7 @@
                 win_final: {
                     title: "Kadr 6: Tong va G'alaba! 🏆",
                     time: "06:00 AM",
-                    image: "sunrise.jpg",
+                    image: "sunrise.webp",
                     text: "Tashqarida quyosh nurlari chiqdi, atrof jim-jit. Qorong'ulik chekindi, qo'rqinchli tun ortda qoldi. Siz tirik qoldingiz, tabriklayman!",
                     buttons: [
                         { text: "🔄 Boshidan qayta o'ynash", next: "step1", reset: true }
@@ -550,6 +513,49 @@
         };
 
         let currentStory = null;
+
+        // Sahna rasmlarini oldindan yuklash va qayta ishlatish
+        const sceneImageCache = new Map();
+        let sceneRenderToken = 0;
+
+        function preloadSceneImage(src) {
+            if (!src) return Promise.resolve(null);
+            if (sceneImageCache.has(src)) return sceneImageCache.get(src);
+
+            const promise = new Promise((resolve) => {
+                const img = new Image();
+                img.decoding = "async";
+                img.loading = "eager";
+                let finished = false;
+
+                const finish = async (ok) => {
+                    if (finished) return;
+                    finished = true;
+                    if (ok && typeof img.decode === "function") {
+                        try { await img.decode(); } catch (e) {}
+                    }
+                    resolve(ok ? img : null);
+                };
+
+                img.addEventListener("load", () => finish(true), { once: true });
+                img.addEventListener("error", () => finish(false), { once: true });
+                img.src = src;
+
+                if (img.complete && img.naturalWidth > 0) finish(true);
+            });
+
+            sceneImageCache.set(src, promise);
+            return promise;
+        }
+
+        function preloadStoryImages(story) {
+            const paths = [...new Set(
+                Object.values(story)
+                    .filter(scene => scene && typeof scene === "object" && scene.image)
+                    .map(scene => scene.image)
+            )];
+            paths.forEach(path => preloadSceneImage(path));
+        }
 
         function updateStatusBar() {
             const hpEl = document.getElementById('hp-val');
@@ -645,6 +651,7 @@
 
         function startStory(storyKey) {
             currentStory = stories[storyKey];
+            preloadStoryImages(currentStory);
             gameState.hp = 100;
             gameState.sanity = 100;
             gameState.inventory = [];
@@ -680,22 +687,11 @@
 
             document.getElementById('node-title').innerText = step.title;
             document.getElementById('time-display').innerText = step.time || "02:15 AM";
-
-            const sceneImg = document.getElementById('scene-img');
-            const thisLoadToken = ++sceneLoadToken;
-
-            // Текст и кнопки показываются сразу, не дожидаясь картинки.
-            // Если картинка уже предзагружена, она появится практически мгновенно.
-            // Если ещё нет — текущий кадр останется на экране до готовности нового.
-            preloadImage(step.image).then((loadedImage) => {
-                if (thisLoadToken !== sceneLoadToken) return; // пользователь уже перешёл дальше
-                if (loadedImage) {
-                    sceneImg.src = loadedImage.src;
-                } else {
-                    // При ошибке загрузки оставляем стандартное поведение браузера
-                    // и показываем URL, чтобы не ломать дальнейшую работу сцены.
-                    sceneImg.src = step.image;
-                }
+            const renderToken = ++sceneRenderToken;
+            const sceneImage = document.getElementById('scene-img');
+            preloadSceneImage(step.image).then(() => {
+                if (renderToken !== sceneRenderToken || gameState.currentNode !== stepKey) return;
+                sceneImage.src = step.image;
             });
 
             const descEl = document.getElementById('story-text');
@@ -726,8 +722,6 @@
                 };
                 btnContainer.appendChild(btn);
             });
-
-            preloadNextScenes(step);
         }
 
         function toggleMusic() {
@@ -763,7 +757,6 @@
             setTimeout(() => document.getElementById('admin-success').classList.add('hidden'), 2000);
         }
 
-        preloadImage("street_night.gif");
         updateStatusBar();
     </script>
 </body>
