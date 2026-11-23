@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="uz" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mistik Arxiv | Visual Novel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&family=Cinzel+Decorative:wght@700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        horrorRed: '#8b0000',
+                        bloodRed: '#ff1a1a',
+                        darkBg: '#030303',
+                        panelBg: '#080808',
+                    },
+                    fontFamily: {
+                        crt: ['"VT323"', 'monospace'],
+                        titleFont: ['"Cinzel Decorative"', 'serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: var(--tg-theme-bg-color, #030303);
+            color: var(--tg-theme-text-color, #d1d5db);
+            font-family: 'VT323', monospace;
+            overflow-x: hidden;
+            touch-action: manipulation;
+        }
+
+        .crt::after {
+            content: " ";
+            display: block;
+            position: fixed;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+                        linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            z-index: 999;
+            background-size: 100% 3px, 3px 100%;
+            pointer-events: none;
+        }
+
+        .vignette {
+            box-shadow: inset 0 0 140px rgba(0,0,0,0.98);
+        }
+
+        @keyframes flicker {
+            0% { opacity: 0.96; }
+            50% { opacity: 1; }
+            52% { opacity: 0.92; }
+            54% { opacity: 1; }
+            80% { opacity: 0.97; }
+            100% { opacity: 0.99; }
+        }
+
+        .crt-flicker {
+            animation: flicker 0.16s infinite;
+        }
+
+        .blood-glow {
+            text-shadow: 0 0 12px rgba(255, 26, 26, 0.8), 0 0 25px rgba(139, 0, 0, 0.7);
+        }
+
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #080808;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #8b0000;
+            border-radius: 2px;
+        }
+
+        .typing-cursor::after {
+            content: "█";
+            animation: blink 0.8s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        .retro-input {
+            width: 100%;
+            padding: 8px 10px;
+            background-color: #050505;
+            border: 1px solid rgba(127, 29, 29, 0.8);
+            border-radius: 6px;
+            color: #f3f4f6;
+            font-family: 'VT323', monospace;
+            font-size: 17px;
+            outline: none;
+            box-sizing: border-box;
+        }
+
+        .retro-input:focus {
+            border-color: #ef4444;
+        }
+    </style>
+</head>
+<body class="crt min-h-screen flex items-center justify-center p-0 sm:p-4">
+
+    <audio id="bg-music" loop></audio>
+    <audio id="screamer-sound">
+        <source src="screamer.mp3" type="audio/mpeg">
+    </audio>
+
+    <div class="w-full max-w-md h-[100vh] sm:h-[880px] bg-panelBg border-0 sm:border-2 border-red-900/60 sm:rounded-2xl shadow-2xl vignette flex flex-col relative overflow-hidden crt-flicker">
+
+        <!-- Top Status Bar -->
+        <header class="bg-black/95 border-b border-red-900/50 p-3 flex justify-between items-center z-10 shrink-0">
+            <div class="flex items-center space-x-2">
+                <div class="w-2.5 h-2.5 rounded-full bg-red-600 animate-ping"></div>
+                <span class="text-red-500 font-crt text-base sm:text-lg tracking-wider" id="header-status-title">QUNDUZ BUVA GAME // LIVE</span>
+            </div>
+
+            <div class="flex items-center space-x-3 text-xs sm:text-sm font-crt">
+                <div class="flex items-center space-x-0.5">
+                    <span class="text-red-400">HP:</span>
+                    <span id="hp-val" class="text-red-500 font-bold">100</span>%
+                </div>
+                <div class="flex items-center space-x-0.5">
+                    <span class="text-purple-400">AQL:</span>
+                    <span id="sanity-val" class="text-purple-300 font-bold">100</span>%
+                </div>
+            </div>
+
+            <button id="musicToggleBtn" onclick="toggleMusic()" class="text-xs sm:text-sm px-2.5 py-1 bg-red-950/60 hover:bg-red-900 text-red-300 border border-red-800 rounded transition font-crt active:scale-95">
+                🔇 Musiqa
+            </button>
+        </header>
+
+        <!-- Main Viewport -->
+        <main class="flex-1 overflow-y-auto p-4 relative z-10 bg-gradient-to-b from-black/80 via-panelBg to-black/95 flex flex-col justify-between">
+
+            <!-- 1. ANKETA -->
+            <div id="profile-screen" class="space-y-3 my-auto">
+                <div class="w-full h-36 bg-black border border-red-950 rounded-lg overflow-hidden relative flex items-center justify-center shadow-inner">
+                    <img src="street_night.gif" alt="Qunduz buva game" class="w-full h-full object-cover opacity-60 filter contrast-125">
+                    <div class="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent flex flex-col justify-end p-3">
+                        <span class="text-xs text-red-400 tracking-widest uppercase">ARXIV TIZIMI // RO'YXAT</span>
+                        <span class="text-xl font-titleFont text-red-500 blood-glow">Qunduz buva game</span>
+                    </div>
+                </div>
+
+                <div class="bg-black/70 border border-red-900/50 rounded-lg p-3.5 space-y-2.5 shadow-lg">
+                    <h2 class="text-lg font-titleFont text-red-400 border-l-2 border-red-600 pl-2">Shaxsiy Ma'lumotlar</h2>
+
+                    <div>
+                        <label class="block text-sm text-gray-300 mb-1">Ismingiz:</label>
+                        <input type="text" id="name" class="retro-input" placeholder="Masalan: Sardor">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm text-gray-300 mb-1">Yoshingiz:</label>
+                        <input type="number" id="age" class="retro-input" placeholder="Masalan: 20">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm text-gray-300 mb-1">Jinsingiz:</label>
+                        <select id="gender" class="retro-input">
+                            <option value="male">Erkak</option>
+                            <option value="female">Ayol</option>
+                        </select>
+                    </div>
+
+                    <button onclick="saveProfile()" class="w-full text-center p-3 bg-red-950/60 hover:bg-red-900/80 border border-red-800 hover:border-red-500 rounded-lg text-gray-100 text-lg tracking-wider transition active:scale-[0.98]">
+                        ▶ PROFILNI SAQLASH
+                    </button>
+
+                    <div id="profile-success" class="hidden text-center text-green-400 text-sm pt-1">
+                        Saqlandi! Menyu ochilmoqda...
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. ASOSIY MENYU -->
+            <div id="menu-screen" class="hidden space-y-3 my-auto">
+                <div class="bg-black/70 border border-red-900/50 rounded-lg p-3.5 shadow-lg">
+                    <div id="welcome-msg" class="text-xl text-white font-bold mb-1.5">Sardor, o'ynashga tayyormisan? 😈</div>
+                    <div id="user-joke" class="text-sm text-gray-400 italic bg-red-950/20 border-l-2 border-red-700 p-2.5 rounded-r">
+                        💡 Hazil: Yosh ulug', lekin yurak yosh!
+                    </div>
+                </div>
+
+                <div class="bg-black/70 border border-red-900/50 rounded-lg p-3.5 space-y-2 shadow-lg">
+                    <h2 class="text-lg font-titleFont text-red-400 border-l-2 border-red-600 pl-2 mb-2">Asosiy Menyu</h2>
+
+                    <button onclick="openStoryList()" class="w-full text-left p-3 bg-red-950/50 hover:bg-red-900/75 border border-red-800 hover:border-red-500 rounded-lg text-gray-100 text-base transition flex items-center justify-between group active:scale-[0.98]">
+                        <span>📖 Hikoyalar (O'ynash)</span>
+                        <span class="text-red-500 group-hover:translate-x-1 transition-transform">▶</span>
+                    </button>
+
+                    <button onclick="editProfile()" class="w-full text-left p-3 bg-black/80 hover:bg-red-950/40 border border-red-950 hover:border-red-700 rounded-lg text-gray-200 text-base transition flex items-center justify-between group active:scale-[0.98]">
+                        <span>✏️ Profilni tahrirlash</span>
+                        <span class="text-red-500 group-hover:translate-x-1 transition-transform">▶</span>
+                    </button>
+
+                    <button onclick="openAdminChat()" class="w-full text-left p-3 bg-black/80 hover:bg-red-950/40 border border-red-950 hover:border-red-700 rounded-lg text-gray-200 text-base transition flex items-center justify-between group active:scale-[0.98]">
+                        <span>💬 Adminga yozish</span>
+                        <span class="text-red-500 group-hover:translate-x-1 transition-transform">▶</span>
+                    </button>
+
+                    <button onclick="openDonate()" class="w-full text-left p-3 bg-black/80 hover:bg-red-950/40 border border-red-950 hover:border-red-700 rounded-lg text-gray-200 text-base transition flex items-center justify-between group active:scale-[0.98]">
+                        <span>⭐ Donat qilish</span>
+                        <span class="text-red-500 group-hover:translate-x-1 transition-transform">▶</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 3. HIKOYALAR RO'YXATI -->
+            <div id="story-list-screen" class="hidden space-y-3 my-auto">
+                <div class="bg-black/70 border border-red-900/50 rounded-lg p-3.5 space-y-2.5 shadow-lg">
+                    <h2 class="text-lg font-titleFont text-red-400 border-l-2 border-red-600 pl-2">Mistik Hikoyalar Ro'yxati</h2>
+
+                    <div onclick="startStory('street')" class="p-3 bg-red-950/40 hover:bg-red-900/70 border border-red-900/80 hover:border-red-500 rounded-lg cursor-pointer text-gray-100 font-bold flex justify-between items-center text-base transition active:scale-[0.98]">
+                        <span>👻 Qorong'u ko'cha va Sirli Ayol</span>
+                        <span class="text-red-400 text-sm">▶ O'ynash</span>
+                    </div>
+
+                    <div class="p-3 bg-black/60 border border-red-950/50 rounded-lg opacity-55 cursor-not-allowed text-gray-400 flex justify-between items-center text-base">
+                        <span>🔒 Yaqin kunlarda yangi hikoya...</span>
+                        <span class="text-xs text-gray-500">Tez kunda</span>
+                    </div>
+
+                    <button onclick="backToMainMenu()" class="w-full text-left p-3 bg-black/80 hover:bg-red-950/40 border border-red-950 hover:border-red-700 rounded-lg text-gray-300 text-base transition flex items-center justify-between group active:scale-[0.98] mt-2">
+                        <span>🔙 Menyuga qaytish</span>
+                        <span class="text-red-500 group-hover:translate-x-1 transition-transform">▶</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 4. O'YIN SAHNASI -->
+            <div id="game-screen" class="hidden flex-1 flex flex-col justify-between">
+                <div class="w-full h-44 sm:h-52 bg-black border border-red-950 rounded-lg overflow-hidden relative mb-3 flex items-center justify-center shadow-inner shrink-0">
+                    <div class="absolute inset-0 bg-red-950/20 z-0"></div>
+                    <img id="scene-img" src="" alt="Scene" class="w-full h-full object-cover z-10 filter contrast-125 brightness-80">
+                    <div id="time-display" class="absolute bottom-2 left-2 z-20 bg-black/85 px-2 py-0.5 rounded text-xs text-red-400 border border-red-900/60">
+                        02:15 AM
+                    </div>
+                </div>
+
+                <div class="flex-1 flex flex-col justify-center my-1">
+                    <h2 id="node-title" class="text-lg sm:text-xl font-titleFont text-red-500 mb-2 blood-glow tracking-wide text-center">
+                        Sahna
+                    </h2>
+                    <div class="bg-black/65 border-l-2 border-red-700 p-3 rounded-r shadow-lg">
+                        <p id="story-text" class="text-gray-300 text-base sm:text-lg leading-relaxed tracking-wide typing-cursor">
+                            Yuklanmoqda...
+                        </p>
+                    </div>
+                </div>
+
+                <div id="choices-container" class="space-y-2 mt-auto pt-2 shrink-0"></div>
+
+                <button onclick="openStoryList()" class="w-full text-left p-2.5 bg-black/80 hover:bg-red-950/40 border border-red-950 hover:border-red-700 rounded-lg text-gray-400 text-sm transition flex items-center justify-between group active:scale-[0.98] mt-2 shrink-0">
+                    <span>🔙 Hikoyalar ro'yxatiga qaytish</span>
+                    <span class="text-red-500 group-hover:translate-x-1 transition-transform">▶</span>
+                </button>
+            </div>
+
+            <!-- 5. HIKOYA YUBORISH -->
+            <div id="story-screen" class="hidden mt-3 shrink-0">
+                <div class="bg-black/70 border border-red-900/50 rounded-lg p-3.5 space-y-2 shadow-lg">
+                    <h2 class="text-base font-titleFont text-red-400 border-l-2 border-red-600 pl-2">Hikoya Yuborish</h2>
+                    <textarea id="user-text" rows="2" class="retro-input" placeholder="O'z qo'rqinchli voqeangizni yozing..."></textarea>
+                    <button onclick="sendToAdmin()" class="w-full text-center p-2.5 bg-red-950/60 hover:bg-red-900/80 border border-red-800 hover:border-red-500 rounded-lg text-gray-100 text-base tracking-wider transition active:scale-[0.98]">
+                        ADMINGA YUBORISH
+                    </button>
+                    <div id="admin-success" class="hidden text-center text-green-400 text-sm">
+                        Yuborildi!
+                    </div>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Footer Bar -->
+        <footer class="bg-black/95 border-t border-red-950 p-2 text-center text-xs text-gray-500 font-crt z-10 shrink-0 flex justify-between items-center px-3 gap-2">
+            <span class="text-red-300/90 truncate" title="Sizning reklamangiz bu yerda bo'lishi mumkin">
+                📢 Sizning reklamangiz bu yerda bo'lishi mumkin
+            </span>
+            <span id="inventory-display" class="text-red-400 shrink-0">🎒 [ Bo'sh ]</span>
+        </footer>
+
+    </div>
+
+    <script>
+        let tg = window.Telegram?.WebApp;
+        if (tg) {
+            tg.expand();
+            tg.ready();
+        }
+
+        const MENU_MUSIC = "menu_theme.mp3";
+        let music = document.getElementById('bg-music');
+        let screamer = document.getElementById('screamer-sound');
+        let musicBtn = document.getElementById('musicToggleBtn');
+        let isPlaying = false;
+        let currentTrack = "";
+        let pendingAutoplaySrc = "";
+
+        let gameState = {
+            hp: 100,
+            sanity: 100,
+            currentNode: 'step1',
+            isTyping: false,
+            typeInterval: null,
+            inventory: []
+        };
+
+        music.addEventListener('play', () => {
+            isPlaying = true;
+            musicBtn.innerHTML = "🔊 Musiqa";
+        });
+
+        music.addEventListener('pause', () => {
+            isPlaying = false;
+            musicBtn.innerHTML = "🔇 Musiqa";
+        });
+
+        function playTrack(src, forceRestart = false) {
+            if (!src) return;
+
+            if (currentTrack !== src) {
+                currentTrack = src;
+                music.src = src;
+                music.load();
+                music.currentTime = 0;
+            } else if (forceRestart) {
+                music.currentTime = 0;
+            }
+
+            music.play().then(() => {
+                pendingAutoplaySrc = "";
+            }).catch(() => {
+                pendingAutoplaySrc = src;
+            });
+        }
+
+        function unlockAudioOnInteraction() {
+            if (pendingAutoplaySrc) {
+                const target = pendingAutoplaySrc;
+                pendingAutoplaySrc = "";
+                playTrack(target, false);
+            }
+        }
+
+        document.addEventListener('pointerdown', unlockAudioOnInteraction, { passive: true });
+        document.addEventListener('keydown', unlockAudioOnInteraction);
+
+        const stories = {
+            street: {
+                music: "music_game1.mp3",
+                step1: {
+                    title: "Kadr 1: Qorong'u ko'cha",
+                    time: "02:15 AM",
+                    image: "street_night.gif",
+                    text: "Kechasi sovuq ko'chadan ketib boryapsan. Tungi soat 2:15. To'satdan orqa tomondan kimdir seni isming bilan sekin chaqirdi...",
+                    buttons: [
+                        { text: "A) Orqaga o'girilib qarash 👀", next: "step2_woman", hp: 0, sanity: -5 },
+                        { text: "B) O'girilmasdan yugurib ketish 🏃‍♂️", next: "step1_2_forest", hp: 0, sanity: -10 }
+                    ]
+                },
+                step2_woman: {
+                    title: "Kadr 2: Oq ko'ylakli ayol",
+                    time: "02:20 AM",
+                    image: "woman_in_white.gif",
+                    text: "Sen orqaga o'girilding. Xira fonar nuri ostida oq ko'ylak kiygan ayol yuzini sochlari bilan to'sgancha jimgina senga qarab turibdi. U yig'lamsirab: 'Manga yordam ber...' dedi.",
+                    buttons: [
+                        { text: "A) Yordam berish 🤝", next: "step3", hp: 0, sanity: +5 },
+                        { text: "B) Qochib ketish 🏃‍♂️", next: "step2_1_swamp", hp: -10, sanity: -15 }
+                    ]
+                },
+                step2_1_swamp: {
+                    title: "Kadr 2.1: Botqoqlik",
+                    time: "02:28 AM",
+                    image: "swamp.gif",
+                    text: "Sen qo'rqib qochib ketding va qorong'ulikda botqoqlikka kirib qolding. Oyoqlaringni loy sekin-sekin yutib, pastga tortmoqda. To'satdan oldingda paydo bo'lib o'sha ayol jimgina qarab turibdi...",
+                    buttons: [
+                        { text: "A) Cho'kib o'lish 💀", next: "death_swamp_sink", hp: -100, sanity: -100 },
+                        { text: "B) Ayoldan yordam so'rash 🆘", next: "death_swamp_revenge", hp: -100, sanity: -80 }
+                    ]
+                },
+                death_swamp_sink: {
+                    title: "O'lim 💀",
+                    time: "02:35 AM",
+                    image: "monster_jump.jpg",
+                    text: "Hech kimdan yordam so'ramasdan, botqoq seni oxirigacha yutib yubordi... O'yin tugadi!",
+                    action: "die",
+                    buttons: [
+                        { text: "🔄 Qaytadan boshlash", next: "step1", reset: true }
+                    ]
+                },
+                death_swamp_revenge: {
+                    title: "O'lim 💀",
+                    time: "02:35 AM",
+                    image: "woman_angry.jpg",
+                    text: "Sen ayoldan yordam so'rading. Lekin u sovuqqonlik bilan dedi: 'Men sendan yordam so'radim, lekin sen yordam bermading... Men ham senga yordam bermayman!' U burilib ketdi, botqoq esa seni yutib yubordi...",
+                    action: "die",
+                    buttons: [
+                        { text: "🔄 Qaytadan boshlash", next: "step1", reset: true }
+                    ]
+                },
+                step1_2_forest: {
+                    title: "Kadr 1.2: Qorong'u o'rmon",
+                    time: "02:22 AM",
+                    image: "red_eyes_forest.gif",
+                    text: "Sen to'xtamasdan yugurib, qorong'u so'qmoqqa kirding. Oldinda milt-milt qilgan qizil ko'zlar yaqinlashmoqda!",
+                    buttons: [
+                        { text: "A) Oldinga qarab yurish 🚶‍♂️", next: "death_step", hp: -100, sanity: -100 },
+                        { text: "B) Orqaga qaytish ◀️", next: "step2_woman", hp: -5, sanity: -15 }
+                    ]
+                },
+                death_step: {
+                    title: "O'lim 💀",
+                    time: "02:26 AM",
+                    image: "monster_jump.jpg",
+                    text: "Maxluq seni ushlab oldi! O'yin tugadi!",
+                    action: "die",
+                    buttons: [
+                        { text: "🔄 Qaytadan boshlash", next: "step1", reset: true }
+                    ]
+                },
+                step3: {
+                    title: "Kadr 3: Minnatdorchilik",
+                    time: "02:40 AM",
+                    image: "step3_help.jpg",
+                    item: "Uy kaliti",
+                    text: "Sen ayolga yordam berding. Uning yuzidagi dahshatli ko'rinish yo'qolib, sokinlashdi. U senga kalit uzatib dedi: 'Sen mening qalbimdagi sovuqlikni eritding...'",
+                    buttons: [
+                        { text: "A) Kalitni olib uyga kirish 🔑", next: "step4", hp: 0, sanity: +5 },
+                        { text: "B) Ayoldan yana nimadir so'rash 👀", next: "step3_secret", hp: 0, sanity: -10 }
+                    ]
+                },
+                step3_secret: {
+                    title: "Kadr 3.1: Sirli suhbat",
+                    time: "02:45 AM",
+                    image: "secret_room.jpg",
+                    text: "Sen to'xtading va unga yana savol berishga qaror qilding.",
+                    buttons: [
+                        { text: "A) Senga nima bo'ldi? 👤", next: "step3_truth", hp: 0, sanity: -10 },
+                        { text: "B) Meni aldamayapsanmi? 🤨", next: "death_trap", hp: -100, sanity: -100 }
+                    ]
+                },
+                step3_truth: {
+                    title: "Kadr 3.2: Dahshatli haqiqat",
+                    time: "02:50 AM",
+                    image: "woman_ghost.jpg",
+                    text: "Ayolning ko'zlarida qo'rquv paydo bo'ldi va u past ovozda dedi: 'Meni o'rmondagi o'sha qizil ko'zlar o'ldirishdi... Tezroq uyga kir, bo'lmasa seni ham o'ldirishadi!'",
+                    buttons: [
+                        { text: "🚪 Uyga kirib eshikni qulflash", next: "step4", hp: 0, sanity: -5 }
+                    ]
+                },
+                death_trap: {
+                    title: "O'lim 💀",
+                    time: "02:52 AM",
+                    image: "monster_jump.jpg",
+                    text: "Qiz shivirladi: 'Kech qolding... ular sening orqangda!' Shu onda orqangdan sovuq nafas sezildi... O'yin tugadi!",
+                    action: "die",
+                    buttons: [
+                        { text: "🔄 Qaytadan boshlash", next: "step1", reset: true }
+                    ]
+                },
+                step4: {
+                    title: "Kadr 4: Uydagi tuzoq",
+                    time: "03:05 AM",
+                    image: "house_inside.jpg",
+                    text: "Sen tezlik bilan uyga kirib, eshikni qulflading. Yuraging qorong'u xonada duk-duk urmoqda. To'satdan eshik tinimsiz va kuchli tarzda taqillay boshladi! Xonaga qarasang: bir chetida eski divan, ikkinchi chetida esa katta shkaf turibdi.",
+                    buttons: [
+                        { text: "A) Divanning tagiga kirish 🛋️", next: "step5_1", hp: -100, sanity: -100 },
+                        { text: "B) Shkafning ichiga kirish 🚪", next: "step5_2", hp: 0, sanity: -15 }
+                    ]
+                },
+                step5_1: {
+                    title: "Kadr 5.1: Fojia",
+                    time: "03:12 AM",
+                    image: "monster_under_bed.jpg",
+                    text: "Sen shoshilinch ravishda divan tagiga yashirinding. Eshik bir zarba bilan sindirib ochildi! Dahshatli mahluq sekin odimlab ichkariga kirdi, egilib divan ostiga qaradi va jirkanch jilmayib dedi: 'Men seni topdim...' Jonhizra qichqiriq... O'yin tugadi!",
+                    action: "die",
+                    buttons: [
+                        { text: "🔄 Qaytadan boshlash", next: "step1", reset: true }
+                    ]
+                },
+                step5_2: {
+                    title: "Kadr 5.2: Kutilmagan yordam",
+                    time: "03:18 AM",
+                    image: "wardrobe_hide.jpg",
+                    text: "Sen shkaf ichiga kirib, eshigini sekin yopding. Eshik sindirildi va mahluq ichkariga bostirib kirib xirilladi: 'Men seni baribir topaman!' Lekin to'satdan xonada haligi qizning sovuq ovozi eshitildi: 'Sen unga ozor berishingga qo'ymayman!' Mahluq qo'rqib orqasiga o'girildi va qiz uni o'zi bilan olib ketdi!",
+                    buttons: [
+                        { text: "🌅 Tong otishini kutish", next: "win_final", hp: 0, sanity: +15 }
+                    ]
+                },
+                win_final: {
+                    title: "Kadr 6: Tong va G'alaba! 🏆",
+                    time: "06:00 AM",
+                    image: "sunrise.jpg",
+                    text: "Tashqarida quyosh nurlari chiqdi, atrof jim-jit. Qorong'ulik chekindi, qo'rqinchli tun ortda qoldi. Siz tirik qoldingiz, tabriklayman!",
+                    buttons: [
+                        { text: "🔄 Boshidan qayta o'ynash", next: "step1", reset: true }
+                    ]
+                }
+            }
+        };
+
+        let currentStory = null;
+
+        function updateStatusBar() {
+            const hpEl = document.getElementById('hp-val');
+            const sanityEl = document.getElementById('sanity-val');
+            hpEl.innerText = gameState.hp;
+            sanityEl.innerText = gameState.sanity;
+            hpEl.className = gameState.hp < 30 ? 'text-red-600 font-bold animate-pulse' : 'text-red-500 font-bold';
+            sanityEl.className = gameState.sanity < 30 ? 'text-purple-600 font-bold animate-pulse' : 'text-purple-300 font-bold';
+
+            const invEl = document.getElementById('inventory-display');
+            invEl.innerText = gameState.inventory.length > 0
+                ? `🎒 [ ${gameState.inventory.join(', ')} ]`
+                : "🎒 [ Bo'sh ]";
+        }
+
+        function typeText(textElement, fullText) {
+            if (gameState.isTyping) {
+                clearInterval(gameState.typeInterval);
+            }
+            gameState.isTyping = true;
+            textElement.innerText = "";
+            let i = 0;
+
+            gameState.typeInterval = setInterval(() => {
+                if (i < fullText.length) {
+                    textElement.innerText += fullText.charAt(i);
+                    i++;
+                } else {
+                    clearInterval(gameState.typeInterval);
+                    gameState.isTyping = false;
+                }
+            }, 18);
+        }
+
+        function saveProfile() {
+            let name = document.getElementById('name').value.trim();
+            let age = parseInt(document.getElementById('age').value, 10);
+            let gender = document.getElementById('gender').value;
+
+            if (!name) { alert("Ismni kiriting!"); return; }
+            if (!age) { alert("Yoshingizni kiriting!"); return; }
+
+            if (tg?.sendData) {
+                tg.sendData(JSON.stringify({ action: "save_profile", name, age, gender }));
+            }
+
+            document.getElementById('welcome-msg').innerText = `${name}, o'ynashga tayyormisan? 😈`;
+
+            let joke = "";
+            if (age < 18) {
+                joke = "💡 Hazil: Uydagilardan yashirincha qo'rqinchli o'yin o'ynayotganingni ota-onang bilmasin! 😉";
+            } else if (age >= 18 && age <= 25) {
+                joke = "💡 Hazil: Studentning cho'ntagi kabi bu o'yinning ham tubi qorong'u... 🎒";
+            } else {
+                joke = "💡 Hazil: Yosh ulug', lekin tungi soat 2 da qo'rqinchli o'ynayotganingizdan xavotirdamiz! 🧓😂";
+            }
+            document.getElementById('user-joke').innerText = joke;
+
+            document.getElementById('profile-success').classList.remove('hidden');
+
+            setTimeout(() => {
+                document.getElementById('profile-screen').classList.add('hidden');
+                document.getElementById('menu-screen').classList.remove('hidden');
+                document.getElementById('story-screen').classList.remove('hidden');
+                document.getElementById('profile-success').classList.add('hidden');
+                playTrack(MENU_MUSIC, true);
+            }, 900);
+        }
+
+        function editProfile() {
+            document.getElementById('menu-screen').classList.add('hidden');
+            document.getElementById('story-screen').classList.add('hidden');
+            document.getElementById('profile-screen').classList.remove('hidden');
+        }
+
+        function openStoryList() {
+            screamer.pause();
+            screamer.currentTime = 0;
+            document.getElementById('menu-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('story-list-screen').classList.remove('hidden');
+            document.getElementById('story-screen').classList.remove('hidden');
+            playTrack(MENU_MUSIC, true);
+        }
+
+        function backToMainMenu() {
+            screamer.pause();
+            screamer.currentTime = 0;
+            document.getElementById('story-list-screen').classList.add('hidden');
+            document.getElementById('menu-screen').classList.remove('hidden');
+            playTrack(MENU_MUSIC, true);
+        }
+
+        function startStory(storyKey) {
+            currentStory = stories[storyKey];
+            gameState.hp = 100;
+            gameState.sanity = 100;
+            gameState.inventory = [];
+            updateStatusBar();
+
+            document.getElementById('story-list-screen').classList.add('hidden');
+            document.getElementById('story-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+
+            playTrack(currentStory.music, true);
+            showScene('step1');
+        }
+
+        function showScene(stepKey) {
+            let step = currentStory[stepKey];
+            if (!step) return;
+
+            gameState.currentNode = stepKey;
+
+            if (step.item && !gameState.inventory.includes(step.item)) {
+                gameState.inventory.push(step.item);
+            }
+
+            if (step.action === "die") {
+                gameState.hp = 0;
+                gameState.sanity = 0;
+                music.pause();
+                screamer.currentTime = 0;
+                screamer.play().catch(() => {});
+            }
+
+            updateStatusBar();
+
+            document.getElementById('node-title').innerText = step.title;
+            document.getElementById('time-display').innerText = step.time || "02:15 AM";
+            document.getElementById('scene-img').src = step.image;
+
+            const descEl = document.getElementById('story-text');
+            typeText(descEl, step.text);
+
+            let btnContainer = document.getElementById('choices-container');
+            btnContainer.innerHTML = "";
+
+            step.buttons.forEach(btnInfo => {
+                let btn = document.createElement('button');
+                btn.className = "w-full text-left p-3 bg-red-950/40 hover:bg-red-900/70 border border-red-900/80 hover:border-red-500 rounded-lg text-gray-200 text-base transition-all duration-200 flex items-center justify-between group shadow-md active:scale-[0.98]";
+                btn.innerHTML = `
+                    <span>${btnInfo.text}</span>
+                    <span class="text-red-500 group-hover:translate-x-1 transition-transform">▶</span>
+                `;
+                btn.onclick = () => {
+                    if (btnInfo.reset) {
+                        gameState.hp = 100;
+                        gameState.sanity = 100;
+                        gameState.inventory = [];
+                        playTrack(currentStory.music, true);
+                    } else {
+                        gameState.hp = Math.max(0, Math.min(100, gameState.hp + (btnInfo.hp || 0)));
+                        gameState.sanity = Math.max(0, Math.min(100, gameState.sanity + (btnInfo.sanity || 0)));
+                    }
+                    updateStatusBar();
+                    showScene(btnInfo.next);
+                };
+                btnContainer.appendChild(btn);
+            });
+        }
+
+        function toggleMusic() {
+            if (isPlaying) {
+                music.pause();
+            } else {
+                if (!currentTrack) {
+                    currentTrack = MENU_MUSIC;
+                }
+                if (!music.src || !music.src.endsWith(currentTrack)) {
+                    music.src = currentTrack;
+                }
+                music.play().catch(() => {});
+            }
+        }
+
+        function openAdminChat() {
+            window.open('https://t.me/YOUR_ADMIN_USERNAME', '_blank');
+        }
+
+        function openDonate() {
+            window.open('https://t.me/send?start=your_donate_link', '_blank');
+        }
+
+        function sendToAdmin() {
+            let text = document.getElementById('user-text').value.trim();
+            if (!text) { alert("Matnni yozing!"); return; }
+            if (tg?.sendData) {
+                tg.sendData(JSON.stringify({ action: "send_to_admin", text }));
+            }
+            document.getElementById('user-text').value = '';
+            document.getElementById('admin-success').classList.remove('hidden');
+            setTimeout(() => document.getElementById('admin-success').classList.add('hidden'), 2000);
+        }
+
+        updateStatusBar();
+    </script>
+</body>
+</html>
